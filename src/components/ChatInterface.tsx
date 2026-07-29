@@ -6,46 +6,20 @@ import { createClient } from "../../lib/supabase/client"; // REAL DATABASE
 import { 
   Search, Send, Image as ImageIcon, ArrowLeft, 
   Info, Trash2, User, Grid, MoreVertical, 
-  Copy, Edit2, CornerUpRight, Users, Plus, X, Check, Mic
+  Copy, Edit2, CornerUpRight, Users, Plus, X, Check, Mic, Loader2
 } from "lucide-react";
-
-// Mock Data for Initial Chats (Fallback if no real friends yet)
-const initialChats = [
-  { id: 1, username: "alex_design", avatar: "A", lastMessage: "Sent a post", time: "2m", unread: 1, color: "from-indigo-500 to-cyan-500", isGroup: false },
-  { id: 2, username: "Design Team Alpha", avatar: "D", lastMessage: "Sarah: Loved the new post!", time: "1h", unread: 0, color: "from-blue-500 to-indigo-600", isGroup: true },
-  { id: 3, username: "jordan_captures", avatar: "J", lastMessage: "Are we still on for tomorrow?", time: "3h", unread: 0, color: "from-emerald-500 to-teal-500", isGroup: false },
-];
-
-// Mock Data for Friends (To pick from when creating a group)
-const mockFriends = [
-  { id: 101, username: "alex_design", avatar: "A", color: "from-indigo-500 to-cyan-500" },
-  { id: 102, username: "sarah.codes", avatar: "S", color: "from-purple-500 to-pink-500" },
-  { id: 103, username: "jordan_captures", avatar: "J", color: "from-emerald-500 to-teal-500" },
-  { id: 104, username: "mike_builds", avatar: "M", color: "from-orange-500 to-red-500" },
-];
-
-const initialMessages = [
-  { id: 1, type: "text", text: "Hey! Check out this new post I found.", sender: "them", time: "10:00 AM" },
-  { 
-    id: 2, 
-    type: "shared_post", 
-    postImage: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1364&auto=format&fit=crop", 
-    postAuthor: "sarah.codes", 
-    sender: "them", 
-    time: "10:01 AM" 
-  },
-  { id: 3, type: "text", text: "That matte black aesthetic is so clean.", sender: "me", time: "10:05 AM" },
-];
 
 export default function ChatInterface({ currentUser }: { currentUser: string }) {
   const supabase = createClient();
   const [authUserId, setAuthUserId] = useState<string | null>(null);
 
-  // Main Chat States
-  const [chats, setChats] = useState<any[]>(initialChats);
+  // Main Chat States (Now completely empty by default, no mock data)
+  const [chats, setChats] = useState<any[]>([]);
+  const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeChat, setActiveChat] = useState<any | null>(null);
-  const [messages, setMessages] = useState<any[]>(initialMessages);
+  
+  const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [showInfo, setShowInfo] = useState(false);
   
@@ -94,6 +68,7 @@ export default function ChatInterface({ currentUser }: { currentUser: string }) 
         });
         setChats(realChats);
       }
+      setIsLoadingChats(false);
     };
     fetchFriends();
   }, []);
@@ -149,11 +124,13 @@ export default function ChatInterface({ currentUser }: { currentUser: string }) 
     return () => { supabase.removeChannel(channel); };
   }, [activeChat, authUserId]);
 
-
   // Filter chats for the sidebar
   const filteredChats = chats.filter(chat => 
     chat.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Use only real individual friends for group creation
+  const availableFriendsForGroup = chats.filter(chat => !chat.isGroup);
 
   // --- MESSAGE ACTIONS (NOW CONNECTED TO SUPABASE) ---
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -286,23 +263,29 @@ export default function ChatInterface({ currentUser }: { currentUser: string }) 
               <div>
                 <label className="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">Add Friends</label>
                 <div className="h-48 overflow-y-auto custom-scrollbar space-y-2 pr-2">
-                  {mockFriends.map(friend => (
-                    <div 
-                      key={friend.id}
-                      onClick={() => toggleFriendSelection(friend.id)}
-                      className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-white/5"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full bg-gradient-to-tr ${friend.color} flex items-center justify-center font-bold text-white`}>
-                          {friend.avatar}
-                        </div>
-                        <span className="text-white font-medium">@{friend.username}</span>
-                      </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedFriends.includes(friend.id) ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-neutral-600'}`}>
-                        {selectedFriends.includes(friend.id) && <Check size={14} strokeWidth={3} />}
-                      </div>
+                  {availableFriendsForGroup.length === 0 ? (
+                    <div className="text-center py-6 text-neutral-500 text-sm">
+                      You need to add friends first before creating a group!
                     </div>
-                  ))}
+                  ) : (
+                    availableFriendsForGroup.map(friend => (
+                      <div 
+                        key={friend.id}
+                        onClick={() => toggleFriendSelection(friend.id)}
+                        className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-white/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full bg-gradient-to-tr ${friend.color} flex items-center justify-center font-bold text-white`}>
+                            {friend.avatar}
+                          </div>
+                          <span className="text-white font-medium">@{friend.username}</span>
+                        </div>
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedFriends.includes(friend.id) ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-neutral-600'}`}>
+                          {selectedFriends.includes(friend.id) && <Check size={14} strokeWidth={3} />}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -346,35 +329,50 @@ export default function ChatInterface({ currentUser }: { currentUser: string }) 
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-          {filteredChats.map((chat) => (
-            <div 
-              key={chat.id} 
-              onClick={() => {
-                setActiveChat(chat);
-                setShowInfo(false);
-              }}
-              className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeChat?.id === chat.id ? 'bg-white/10' : 'hover:bg-white/5'}`}
-            >
-              <div className={`w-14 h-14 rounded-full bg-gradient-to-tr ${chat.color} flex items-center justify-center text-xl font-bold text-white relative shadow-lg shrink-0`}>
-                {chat.isGroup ? <Users size={24} /> : chat.avatar}
-                {chat.unread > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-[#0a0a0a] flex items-center justify-center text-[10px] font-bold text-white">
-                    {chat.unread}
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex-1 overflow-hidden">
-                <div className="flex justify-between items-center mb-1">
-                  <h3 className="font-semibold text-white truncate">{chat.username}</h3>
-                  <span className="text-xs text-neutral-500 shrink-0">{chat.time}</span>
+          {isLoadingChats ? (
+             <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+               <Loader2 className="w-6 h-6 animate-spin mb-3 text-indigo-500" />
+               <span className="text-sm">Loading chats...</span>
+             </div>
+          ) : filteredChats.length === 0 ? (
+             <div className="text-center py-12 px-6">
+               <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+                 <Users size={24} className="text-neutral-500" />
+               </div>
+               <h3 className="text-white font-medium mb-1">No chats yet</h3>
+               <p className="text-sm text-neutral-500">Add friends from the feed to start messaging.</p>
+             </div>
+          ) : (
+            filteredChats.map((chat) => (
+              <div 
+                key={chat.id} 
+                onClick={() => {
+                  setActiveChat(chat);
+                  setShowInfo(false);
+                }}
+                className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeChat?.id === chat.id ? 'bg-white/10' : 'hover:bg-white/5'}`}
+              >
+                <div className={`w-14 h-14 rounded-full bg-gradient-to-tr ${chat.color} flex items-center justify-center text-xl font-bold text-white relative shadow-lg shrink-0`}>
+                  {chat.isGroup ? <Users size={24} /> : chat.avatar}
+                  {chat.unread > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-[#0a0a0a] flex items-center justify-center text-[10px] font-bold text-white">
+                      {chat.unread}
+                    </span>
+                  )}
                 </div>
-                <p className={`text-sm truncate ${chat.unread > 0 ? 'text-white font-medium' : 'text-neutral-500'}`}>
-                  {chat.lastMessage}
-                </p>
+                
+                <div className="flex-1 overflow-hidden">
+                  <div className="flex justify-between items-center mb-1">
+                    <h3 className="font-semibold text-white truncate">{chat.username}</h3>
+                    <span className="text-xs text-neutral-500 shrink-0">{chat.time}</span>
+                  </div>
+                  <p className={`text-sm truncate ${chat.unread > 0 ? 'text-white font-medium' : 'text-neutral-500'}`}>
+                    {chat.lastMessage}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
